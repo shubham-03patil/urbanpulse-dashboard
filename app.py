@@ -27,6 +27,13 @@ MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 PAGES = ["Executive Overview", "Traffic Analytics", "Environment",
          "Utilities", "Public Safety", "AI Insights"]
+# If the map background is blank, pick "No basemap" (needs no internet tiles)
+MAP_STYLES = {
+    "Light map (Carto)": "carto-positron",
+    "Dark map (Carto)": "carto-darkmatter",
+    "Street map (OSM)": "open-street-map",
+    "No basemap (always works)": "white-bg",
+}
 
 # Streamlit renamed use_container_width -> width="stretch" in newer versions
 _NEW = tuple(int(p) for p in st.__version__.split(".")[:2]) >= (1, 50)
@@ -225,13 +232,18 @@ def combo_chart(x, bar, line, key, h=300):
 
 def zone_map(df, size_col, key, h):
     z = df.groupby(["Zone_Name", "Latitude", "Longitude"], as_index=False)[size_col].sum()
+    style = MAP_STYLES[map_choice]
     kw = dict(lat="Latitude", lon="Longitude", size=size_col, hover_name="Zone_Name",
               zoom=9.1, size_max=15, color_discrete_sequence=[BLUE],
               hover_data={"Latitude": False, "Longitude": False})
+    if style == "white-bg":
+        kw["text"] = "Zone_Name"
     try:
-        fig = px.scatter_map(z, map_style="open-street-map", **kw)
+        fig = px.scatter_map(z, map_style=style, **kw)
     except AttributeError:  # older plotly
-        fig = px.scatter_mapbox(z, mapbox_style="open-street-map", **kw)
+        fig = px.scatter_mapbox(z, mapbox_style=style, **kw)
+    if style == "white-bg":
+        fig.update_traces(textposition="top center", textfont=dict(size=10, color="#333"))
     fig.update_layout(height=h, margin=dict(l=0, r=0, t=0, b=0),
                       paper_bgcolor="rgba(0,0,0,0)")
     show(fig, key)
@@ -260,6 +272,7 @@ with st.sidebar:
     f_zone = st.selectbox("📍 Zone", ["All"] + sorted(data["Zone_Name"].unique()))
     f_weather = st.selectbox("⛅ Weather", ["All"] + sorted(data["Weather_Condition"].unique()))
     f_event = st.selectbox("🗓️ Event", ["All"] + sorted(data["Event_Name"].dropna().unique()))
+    map_choice = st.selectbox("🗺️ Map style", list(MAP_STYLES))
 
 df = data
 if f_month != "All":
